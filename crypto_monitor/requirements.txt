@@ -1,0 +1,9 @@
+requests
+boto3
+pandas
+networkx
+py-etherscan-api
+web3
+eth-abi
+eth-utils
+python-dotenv
