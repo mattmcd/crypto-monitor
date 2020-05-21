@@ -26,21 +26,27 @@ def read_config():
 
 config = read_config()
 
-CONTRACT_ADDRESS = config['contract_address'] if 'contract_address' in config else ''
+CONTRACT_ADDRESS = os.environ.get('CONTRACT_ADDRESS')
+if not CONTRACT_ADDRESS:
+    CONTRACT_ADDRESS = config['contract_address'] if 'contract_address' in config else ''
 INFURA_PROJECT_ID = config['infura_project_id']
 ETHERSCAN_API_KEY = config['etherscan_api_key']
+NETWORK = os.environ.get('NETWORK')
+if not NETWORK:
+    NETWORK = 'mainnet'
 
 
 def get_contract_events(
         contract_address=CONTRACT_ADDRESS,
         from_block=0,
         topics=None,
-        infura_project_id=INFURA_PROJECT_ID
+        infura_project_id=INFURA_PROJECT_ID,
+        network='mainnet'
 ):
     if topics is None:
         topics = []
     req = requests.post(
-        f'https://mainnet.infura.io/v3/{infura_project_id}',
+        f'https://{network}.infura.io/v3/{infura_project_id}',
         json={
             "jsonrpc": "2.0",
             "method": "eth_getLogs",
@@ -52,9 +58,9 @@ def get_contract_events(
     return resp['result']
 
 
-def get_current_block(infura_project_id=INFURA_PROJECT_ID):
+def get_current_block(infura_project_id=INFURA_PROJECT_ID, network='mainnet'):
     req = requests.post(
-        f'https://mainnet.infura.io/v3/{infura_project_id}',
+        f'https://{network}.infura.io/v3/{infura_project_id}',
         json={
             "jsonrpc": "2.0",
             "method": "eth_blockNumber",
@@ -66,9 +72,9 @@ def get_current_block(infura_project_id=INFURA_PROJECT_ID):
     return int(resp['result'], 16)
 
 
-def get_block_by_number(block_number=None, show_details=False, infura_project_id=INFURA_PROJECT_ID):
+def get_block_by_number(block_number=None, show_details=False, infura_project_id=INFURA_PROJECT_ID, network='mainnet'):
     req = requests.post(
-        f'https://mainnet.infura.io/v3/{infura_project_id}',
+        f'https://{network}.infura.io/v3/{infura_project_id}',
         json={
             "jsonrpc": "2.0",
             "method": "eth_getBlockByNumber",
@@ -82,7 +88,12 @@ def get_block_by_number(block_number=None, show_details=False, infura_project_id
     return res
 
 
-async def subscribe(contract_address=CONTRACT_ADDRESS, topics=None, infura_project_id=INFURA_PROJECT_ID):
+async def subscribe(
+        contract_address=CONTRACT_ADDRESS,
+        topics=None,
+        infura_project_id=INFURA_PROJECT_ID,
+        network='mainnet'
+):
     if topics is None:
         topics = []
     subscribe_args = {
@@ -91,7 +102,7 @@ async def subscribe(contract_address=CONTRACT_ADDRESS, topics=None, infura_proje
             "params": ["logs", {"address": contract_address.lower(), "topics": topics}],
             "id": 1
         }
-    ws_url = f'wss://mainnet.infura.io/ws/{infura_project_id}'
+    ws_url = f'wss://{network}.infura.io/ws/{infura_project_id}'
     async with websockets.connect(ws_url) as ws:
         await ws.send(json.dumps(subscribe_args))
         subscribe_id = await ws.recv()
@@ -115,9 +126,15 @@ async def subscribe(contract_address=CONTRACT_ADDRESS, topics=None, infura_proje
 
 def get_contract_abi(
         contract_address=CONTRACT_ADDRESS,
-        etherscan_api_key=ETHERSCAN_API_KEY
+        etherscan_api_key=ETHERSCAN_API_KEY,
+        network=''
 ):
     es_api = EsContract(address=contract_address, api_key=etherscan_api_key)
+    if network not in {'', 'mainnet'}:
+        es_api.PREFIX = f'https://api-{network}.etherscan.io/api?'
+        es_api.url_dict[es_api.ACTION] = 'getabi'
+    es_api.build_url()
+    print(es_api.url)
     abi = json.loads(es_api.get_abi())
     return abi
 

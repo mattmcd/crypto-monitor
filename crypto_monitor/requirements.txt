@@ -7,3 +7,5 @@ web3
 eth-abi
 eth-utils
 python-dotenv
+cytoolz
+certifi
